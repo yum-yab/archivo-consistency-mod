@@ -10,6 +10,7 @@ import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
 import org.semanticweb.HermiT.Reasoner
 import org.semanticweb.elk.owlapi.ElkReasonerFactory
 import org.semanticweb.owlapi.apibinding.OWLManager
+import org.semanticweb.owlapi.model.IRI
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.context.annotation.Import
 import org.springframework.stereotype.Component
@@ -36,7 +37,7 @@ class Processor : ModProcessor {
     }
 }
 
-fun calculate_openllet_consistency(uri: String): Boolean {
+fun calculateOpenlletConsistency(uri: String): Boolean {
     val model: OntModel = ModelFactory.createOntologyModel(PelletReasonerFactory.THE_SPEC)
     model.read(uri)
     // load the model to the reasoner
@@ -51,17 +52,19 @@ fun calculate_openllet_consistency(uri: String): Boolean {
 
 fun main(args: Array<String>) {
     //runApplication<ConsistencyMod>(*args)
+
+    val testontURI = "https://archivo.dbpedia.org/download?o=http%3A//www.w3.org/ns/shacl%23&f=ttl"
     val reasonerFactory = ElkReasonerFactory()
     val inputHandler = OWLManager.createOWLOntologyManager()
-    val ont = inputHandler.loadOntologyFromOntologyDocument(File("./testont.owl"))
+    val ont = inputHandler.loadOntologyFromOntologyDocument(IRI.create(testontURI))
     val hermitReasoner = Reasoner(ont)
     val reasoner = reasonerFactory.createReasoner(ont)
     val elkConsistency = reasoner.isConsistent
     val hermitConsistency = hermitReasoner.isConsistent
-    val openlletConsistency = calculate_openllet_consistency("https://archivo.dbpedia.org/download?o=http%3A//www.w3.org/ns/shacl%23&f=ttl")
+    val openlletConsistency = calculateOpenlletConsistency("https://archivo.dbpedia.org/download?o=http%3A//www.w3.org/ns/shacl%23&f=ttl")
     println("Ontology consistency: \n" +
-            "ELK: $elkConsistency\n" +
-            "OPENLLET: $openlletConsistency\n" +
-            "HermiT: $hermitConsistency\n")
+            "\tELK: $elkConsistency\n" +
+            "\tOPENLLET: $openlletConsistency\n" +
+            "\tHermiT: $hermitConsistency\n")
 }
 
