@@ -53,15 +53,15 @@ fun calculateOpenlletConsistency(uri: String): Boolean {
 fun main(args: Array<String>) {
     //runApplication<ConsistencyMod>(*args)
 
-    val testontURI = "https://archivo.dbpedia.org/download?o=http%3A//www.w3.org/ns/shacl%23&f=ttl"
+    val testontURI = "https://archivo.dbpedia.org/download?o=http%3A//www.w3.org/ns/shacl%23"
     val reasonerFactory = ElkReasonerFactory()
     val inputHandler = OWLManager.createOWLOntologyManager()
     val ont = inputHandler.loadOntologyFromOntologyDocument(IRI.create(testontURI))
     val hermitReasoner = Reasoner(ont)
-    val reasoner = reasonerFactory.createReasoner(ont)
-    val elkConsistency = reasoner.isConsistent
+    val elkReasoner = reasonerFactory.createReasoner(ont)
+    val elkConsistency = elkReasoner.isConsistent
     val hermitConsistency = hermitReasoner.isConsistent
-    val openlletConsistency = calculateOpenlletConsistency("https://archivo.dbpedia.org/download?o=http%3A//www.w3.org/ns/shacl%23&f=ttl")
+    val openlletConsistency = calculateOpenlletConsistency(testontURI)
     println("Ontology consistency: \n" +
             "\tELK: $elkConsistency\n" +
             "\tOPENLLET: $openlletConsistency\n" +
