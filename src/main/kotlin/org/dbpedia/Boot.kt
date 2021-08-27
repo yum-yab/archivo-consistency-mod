@@ -139,8 +139,8 @@ fun main(args: Array<String>) {
     //runApplication<ConsistencyMod>(*args)
     val inputHandler = OWLManager.createOWLOntologyManager()
     val ont = inputHandler.loadOntologyFromOntologyDocument(File("./testont.owl"))
-    val hermitCheck = HermiTConsistencyCheck(ont)
-    val elkCheck = ELKConsistencyCheck(ont)
+    val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
+    val elkCheck = ELKConsistencyCheck(ont, inputHandler)
 
     val service = Executors.newSingleThreadExecutor()
 

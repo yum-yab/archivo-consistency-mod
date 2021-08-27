@@ -14,7 +14,7 @@ import java.util.concurrent.Callable
 import java.util.function.Supplier
 
 
-abstract class RunnableConsistencyCheck(private val owlOntology: OWLOntology, private val factory: OWLReasonerFactory): Callable<ConsistencyReport> {
+abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, private val factory: OWLReasonerFactory, private val owlOntologyManager: OWLOntologyManager): Callable<ConsistencyReport> {
 
     protected abstract val logger: Logger
 
@@ -28,7 +28,7 @@ abstract class RunnableConsistencyCheck(private val owlOntology: OWLOntology, pr
             val msg = if (consistent) {
                 "Ontology is Consistent"
             } else {
-                val explainator = ExplanationManager.createExplanationGeneratorFactory(factory, OWLOntologyManagerSupplier()).createExplanationGenerator(owlOntology)
+                val explainator = ExplanationManager.createExplanationGeneratorFactory(factory) { owlOntologyManager }.createExplanationGenerator(owlOntology)
                 val df = OWLManager.createOWLOntologyManager().owlDataFactory
                 explainator.getExplanations(df.getOWLSubClassOfAxiom(df.owlThing, df.owlNothing)).map { it.toString() }.toList().joinToString()
             }
@@ -43,11 +43,5 @@ abstract class RunnableConsistencyCheck(private val owlOntology: OWLOntology, pr
             logger.error("Some Error during Consistency Check: " + ex.localizedMessage)
             ConsistencyReport(reasonerCheckID, null, ex.stackTraceToString())
         }
-    }
-}
-
-class OWLOntologyManagerSupplier: Supplier<OWLOntologyManager> {
-    override fun get(): OWLOntologyManager {
-        return OWLManager.createOWLOntologyManager()
     }
 }
