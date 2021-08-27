@@ -2,17 +2,12 @@ package org.dbpedia.consistencyChecks
 
 import org.dbpedia.models.ConsistencyReport
 import org.semanticweb.owl.explanation.api.ExplanationManager
-import org.semanticweb.owl.explanation.impl.blackbox.InitialEntailmentCheckStrategy
-import org.semanticweb.owl.explanation.impl.blackbox.checker.InconsistentOntologyExplanationGeneratorFactory
-import org.semanticweb.owlapi.apibinding.OWLManager
 import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
 import org.semanticweb.owlapi.reasoner.InconsistentOntologyException
 import org.semanticweb.owlapi.reasoner.OWLReasonerFactory
 import org.slf4j.Logger
 import java.util.concurrent.Callable
-import java.util.function.Supplier
-
 
 abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, private val factory: OWLReasonerFactory, private val owlOntologyManager: OWLOntologyManager): Callable<ConsistencyReport> {
 
@@ -29,7 +24,7 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
                 "Ontology is Consistent"
             } else {
                 val explainator = ExplanationManager.createExplanationGeneratorFactory(factory) { owlOntologyManager }.createExplanationGenerator(owlOntology)
-                val df = OWLManager.createOWLOntologyManager().owlDataFactory
+                val df = owlOntologyManager.owlDataFactory
                 explainator.getExplanations(df.getOWLSubClassOfAxiom(df.owlThing, df.owlNothing)).map { it.toString() }.toList().joinToString()
             }
             ConsistencyReport(reasonerCheckID, consistent, msg)
