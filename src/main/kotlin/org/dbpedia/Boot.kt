@@ -6,38 +6,41 @@ import openllet.jena.PelletInfGraph
 import openllet.jena.PelletReasonerFactory
 import org.apache.jena.ontology.OntModel
 import org.apache.jena.rdf.model.ModelFactory
-import org.dbpedia.databus_mods.lib.worker.AsyncWorker
-import org.dbpedia.databus_mods.lib.worker.execution.Extension
-import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
+import org.dbpedia.consistencyChecks.ELKConsistencyCheck
+import org.dbpedia.consistencyChecks.HermiTConsistencyCheck
+//import org.dbpedia.databus_mods.lib.worker.AsyncWorker
+//import org.dbpedia.databus_mods.lib.worker.execution.Extension
+//import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
 import org.semanticweb.elk.owlapi.ElkReasonerFactory
 import org.semanticweb.owlapi.apibinding.OWLManager
 import org.semanticweb.owlapi.model.OWLOntology
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.context.annotation.Import
-import org.springframework.stereotype.Component
+//import org.springframework.boot.autoconfigure.SpringBootApplication
+//import org.springframework.context.annotation.Import
+//import org.springframework.stereotype.Component
 import java.io.File
 import java.io.FileWriter
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
-
-@SpringBootApplication
-@Import(AsyncWorker::class)
-open class ConsistencyMod
-
-@Component
-class Processor : ModProcessor {
-    override fun process(extension: Extension) {
-        // TODO
-        val reasonerFactory = ElkReasonerFactory()
-//        val inputHandler = OWLManager.createOWLOntologyManager()
-//        val ouputHandler = OWLManager.createOWLOntologyManager()
-//        val ont = inputHandler.loadOntologyFromOntologyDocument(File("./testont.owl"))
-//        val reasoner = reasonerFactory.createReasoner(ont)
-//        val isConsistent = reasoner.isConsistent
-//        println("Ontology is consistent: $isConsistent")
-//        extension.setType("http://my.domain/ns#DatabusMod")
-//        // File resultFile = extension.createModResult();
-    }
-}
+//@SpringBootApplication
+//@Import(AsyncWorker::class)
+//open class ConsistencyMod
+//
+//@Component
+//class Processor : ModProcessor {
+//    override fun process(extension: Extension) {
+//        // TODO
+//        val reasonerFactory = ElkReasonerFactory()
+////        val inputHandler = OWLManager.createOWLOntologyManager()
+////        val ouputHandler = OWLManager.createOWLOntologyManager()
+////        val ont = inputHandler.loadOntologyFromOntologyDocument(File("./testont.owl"))
+////        val reasoner = reasonerFactory.createReasoner(ont)
+////        val isConsistent = reasoner.isConsistent
+////        println("Ontology is consistent: $isConsistent")
+////        extension.setType("http://my.domain/ns#DatabusMod")
+////        // File resultFile = extension.createModResult();
+//    }
+//}
 
 data class ConsistencyReport(@SerializedName("hermit_consistency") val hermitConsistency: Boolean?,
                              @SerializedName("elk_consistency") val elkConsistency: Boolean?)
@@ -79,8 +82,7 @@ fun calculateELKConsistency(owlOntology: OWLOntology): Boolean? {
     }
 }
 
-fun main(args: Array<String>) {
-    //runApplication<ConsistencyMod>(*args)
+fun testOntologiesInPath(path: String) {
     val inputHandler = OWLManager.createOWLOntologyManager()
 
     val files = File("/home/denis/Workspace/Job/onto_mini_dump").walk().toList().filter { it.isFile }
@@ -126,11 +128,30 @@ fun main(args: Array<String>) {
         }
     }
 
-    val failed_loading_size = reports.filter { it == null }.size
+    val failedLoadingSize = reports.filter { it == null }.size
     println("Report:\n" +
-            "Failed Loading: $failed_loading_size\n" +
+            "Failed Loading: $failedLoadingSize\n" +
             "Hermit Reasoner: $hermitConsistent consistent, $hermitInconsistent inconsistent, $hermitError had an error\n" +
             "ELK Reasoner: $elkConsistent consistent, $elkInconsistent inconsistent, $elkError had an error\n")
+}
 
+fun main(args: Array<String>) {
+    //runApplication<ConsistencyMod>(*args)
+    val inputHandler = OWLManager.createOWLOntologyManager()
+    val ont = inputHandler.loadOntologyFromOntologyDocument(File("./testont.owl"))
+    val hermitCheck = HermiTConsistencyCheck(ont)
+    val elkCheck = ELKConsistencyCheck(ont)
+
+    val service = Executors.newSingleThreadExecutor()
+
+    val future = service.submit(hermitCheck)
+
+    println(future.get(5, TimeUnit.MINUTES))
+
+    val elkFuture = service.submit(elkCheck)
+
+    println(elkFuture.get(5, TimeUnit.MINUTES))
+
+    service.shutdown()
 }
 
