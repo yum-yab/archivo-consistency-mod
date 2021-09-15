@@ -23,6 +23,7 @@ import org.semanticweb.elk.owlapi.ElkReasonerFactory
 import org.semanticweb.owlapi.apibinding.OWLManager
 import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 //import org.springframework.boot.autoconfigure.SpringBootApplication
 //import org.springframework.context.annotation.Import
@@ -54,6 +55,9 @@ import java.util.concurrent.TimeoutException
 ////        // File resultFile = extension.createModResult();
 //    }
 //}
+
+
+val logger = LoggerFactory.getLogger("MAINSCRIPT")
 
 data class ConsistencyReportOld(@SerializedName("hermit_consistency") val hermitConsistency: Boolean?,
                                 @SerializedName("elk_consistency") val elkConsistency: Boolean?)
@@ -90,13 +94,15 @@ fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOn
 }
 
 fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ConsistencyReport {
+    logger.info("Running ${check.reasonerCheckID}...")
     val service = Executors.newSingleThreadExecutor()
     try {
         val future = service.submit(check)
         val report = future.get(timeOutCounter, timeOutUnit)
+        logger.info("Finished Report of ${check.reasonerCheckID}: $report")
         return report
     } catch (timeEx: TimeoutException) {
-        println(timeEx.stackTraceToString())
+        logger.error(timeEx.stackTraceToString())
         return ConsistencyReport(check.reasonerCheckID, null, "Timeout uring execution", -1, 0)
     } finally {
         service.shutdown()
@@ -106,6 +112,8 @@ fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOu
 fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, timeOutUnit: TimeUnit = TimeUnit.MINUTES): OntologyReport {
 
     // Download File
+
+    logger.info("Started process for ontology: ${archivoOnt.databusFileID}\nDownloading Fil for ont \"${archivoOnt.title}\": ${archivoOnt.dlURL}")
     val client = HttpClient.newHttpClient()
     val req = HttpRequest.newBuilder().uri(URI.create(archivoOnt.dlURL)).build()
     val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
@@ -121,6 +129,7 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
     val classCount = ont.classesInSignature().count().toInt()
     val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
     val triples = -1
+    logger.info("Starting Consistency Checks...")
     val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
     val elkCheck = ELKConsistencyCheck(ont, inputHandler)
     val openlletCheck = OpenlletConsistencyCheck(ont, inputHandler)
@@ -237,7 +246,7 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
 		  FILTER (!regex(?art, "--DEV"))
 		  # Excludes sorted versions to prevent duplicates
 		  MINUS { ?distribution dataid:contentVariant 'sorted'^^xsd:string . }
-}  """
+} ORDER BY ?file  """
     val ontList = getArchivoOntsByQuery(sparql_string)
     println(ontList.size)
     for (ont in ontList) {
