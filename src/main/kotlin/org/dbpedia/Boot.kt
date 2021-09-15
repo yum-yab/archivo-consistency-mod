@@ -203,6 +203,7 @@ fun main(args: Array<String>) {
 //    println(elkFuture.get(5, TimeUnit.MINUTES))
 //
 //    service.shutdown()
+    org.apache.jena.query.ARQ.init()
     JenaRuntime.isRDF11 = false
     val sparql_string = """PREFIX dc: <http://purl.org/dc/elements/1.1/>
 PREFIX data: <http://data.odw.tw/>
