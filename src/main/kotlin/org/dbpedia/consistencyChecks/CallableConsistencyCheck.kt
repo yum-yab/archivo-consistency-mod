@@ -43,7 +43,7 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
         }
         catch (ex: Exception) {
             logger.error("Some Error during Consistency Check: " + ex.stackTraceToString())
-            ConsistencyReport(reasonerCheckID, null, ex.stackTraceToString(), -1, -1)
+            ConsistencyReport(reasonerCheckID, null, ex.stackTraceToString(), -6, -6)
         }
     }
 }
