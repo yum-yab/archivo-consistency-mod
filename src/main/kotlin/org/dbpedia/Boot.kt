@@ -279,9 +279,9 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
         logger.info(report.toString())
         File("./output.csv").appendText(report.toRow() + "\n")
     }
-    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
-        "Allotrope Foundation Ontology (REC/2021/03)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
-    val report = generateReportOfOntology(archivoOnt, 2)
-    println(report)
+//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
+//        "Allotrope Foundation Ontology (REC/2021/03)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+//    val report = generateReportOfOntology(archivoOnt, 2)
+//    println(report)
 }
 
