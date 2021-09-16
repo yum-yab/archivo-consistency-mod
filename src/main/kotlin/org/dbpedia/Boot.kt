@@ -79,7 +79,7 @@ data class OntologyReport(val ontology: ArchivoOntology,
                           val tripleCount: Int) {
 
     fun toRow(): String {
-        return "${ontology.databusFileID},${ontology.title},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${openlletReport.timeUsed},${openlletReport.memoryUsage},${elkReport.timeUsed},${elkReport.memoryUsage}"
+        return "${ontology.databusFileID},${ontology.title.replace(",", ";")},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${hermitReport.message.replace(",", ";")},${openlletReport.timeUsed},${openlletReport.memoryUsage},${openlletReport.message.replace(",", ";")},${elkReport.timeUsed},${elkReport.memoryUsage},${elkReport.message.replace(",", ";")}"
     }
 }
 
@@ -259,6 +259,9 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
     var stopCounter = 0
     val ontList = getArchivoOntsByQuery(sparql_string)
     println(ontList.size)
+    if (lastStop == "") {
+        stopReached = true
+    }
     for (ont in ontList) {
         if (!stopReached && ont.databusFileID != lastStop) {
             stopCounter++
@@ -273,12 +276,12 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
             continue
         }
         val report = generateReportOfOntology(ont, 10)
-        println(report)
+        logger.info(report.toString())
         File("./output.csv").appendText(report.toRow() + "\n")
     }
-//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
-//        "Allotrope Foundation Ontology (REC/2021/03)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
-//    val report = generateReportOfOntology(archivoOnt, 2)
-//    println(report)
+    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
+        "Allotrope Foundation Ontology (REC/2021/03)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+    val report = generateReportOfOntology(archivoOnt, 2)
+    println(report)
 }
 

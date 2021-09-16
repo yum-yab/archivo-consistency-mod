@@ -38,11 +38,11 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
             logger.debug(incnsEx.stackTraceToString())
             ConsistencyReport(reasonerCheckID, false, incnsEx.stackTraceToString(), 0, 0)
         } catch (ex: OutOfMemoryError) {
-            logger.error("Out of Memory for ")
+            logger.error("Out of Memory: " + ex.stackTraceToString())
             ConsistencyReport(reasonerCheckID, false, ex.stackTraceToString(), 0, -1)
         }
         catch (ex: Exception) {
-            logger.error("Some Error during Consistency Check: " + ex.localizedMessage)
+            logger.error("Some Error during Consistency Check: " + ex.stackTraceToString())
             ConsistencyReport(reasonerCheckID, null, ex.stackTraceToString(), -1, -1)
         }
     }
