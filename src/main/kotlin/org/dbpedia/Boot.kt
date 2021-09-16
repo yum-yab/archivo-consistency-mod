@@ -35,6 +35,9 @@ import java.net.http.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import org.dbpedia.helpers.HelperFunctions
+import org.semanticweb.owlapi.rdf.rdfxml.parser.TripleLogger
+import java.io.InputStream
 
 //@SpringBootApplication
 //@Import(AsyncWorker::class)
@@ -81,10 +84,10 @@ data class OntologyReport(val ontology: ArchivoOntology,
 }
 
 fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOntology? {
-
     return try {
-        val inputStream = ByteArrayInputStream(ntString.toByteArray())
-        val ont = inputHandler.loadOntologyFromOntologyDocument(inputStream)
+        val ont = ByteArrayInputStream(ntString.toByteArray()).use {
+                input -> inputHandler.loadOntologyFromOntologyDocument(input)
+        }
         ont
     } catch (ex: Exception) {
         null
@@ -96,14 +99,15 @@ fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOn
 fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ConsistencyReport {
     logger.info("Running ${check.reasonerCheckID}...")
     val service = Executors.newSingleThreadExecutor()
-    try {
+    return try {
         val future = service.submit(check)
         val report = future.get(timeOutCounter, timeOutUnit)
         logger.info("Finished Report of ${check.reasonerCheckID}: $report")
-        return report
+        report
     } catch (timeEx: TimeoutException) {
         logger.error(timeEx.stackTraceToString())
-        return ConsistencyReport(check.reasonerCheckID, null, "Timeout uring execution", -1, 0)
+        service.shutdown()
+        ConsistencyReport(check.reasonerCheckID, null, "Timeout uring execution", -1, 0)
     } finally {
         service.shutdown()
     }
@@ -124,7 +128,7 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
     // load into owlapi
     val inputHandler = OWLManager.createOWLOntologyManager()
     val ont = loadOntFromString(ntString, inputHandler) ?: return OntologyReport(archivoOnt, ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), -1, -1, -1, byteSize, -1)
-
+    logger.info("Started generating the Stats for the ontology...")
     val axiomCount = ont.axiomCount
     val classCount = ont.classesInSignature().count().toInt()
     val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
@@ -247,16 +251,34 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
 		  # Excludes sorted versions to prevent duplicates
 		  MINUS { ?distribution dataid:contentVariant 'sorted'^^xsd:string . }
 } ORDER BY ?file  """
+
+    val skiplist = listOf("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+
+    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt"
+    var stopReached = false
+    var stopCounter = 0
     val ontList = getArchivoOntsByQuery(sparql_string)
     println(ontList.size)
     for (ont in ontList) {
+        if (!stopReached && ont.databusFileID != lastStop) {
+            stopCounter++
+            continue
+        } else if (!stopReached && ont.databusFileID == lastStop) {
+            stopReached = true
+            logger.info("Skipped $stopCounter Ontologies, found the last executed one")
+            continue
+        }
+        if (skiplist.contains(ont.databusFileID)){
+            logger.info("Skipped ontology ${ont.databusFileID}")
+            continue
+        }
         val report = generateReportOfOntology(ont, 10)
         println(report)
         File("./output.csv").appendText(report.toRow() + "\n")
     }
-//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/dbpedia.org/ontology/2021.09.15-100002/ontology_type=parsed.nt",
-//        "The DBpedia Ontology", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/dbpedia.org/ontology/2021.09.15-100002/ontology_type=parsed.nt")
-//    val report = generateReportOfOntology(archivoOnt, 10)
+//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
+//        "Allotrope Foundation Ontology (REC/2021/03)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+//    val report = generateReportOfOntology(archivoOnt, 2)
 //    println(report)
 }
 
