@@ -90,8 +90,10 @@ fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOn
         }
         ont
     } catch (ex: Exception) {
+        logger.error("Exception during loading of Ontology: " + ex.stackTraceToString())
         null
     } catch (ex: java.lang.Exception) {
+        logger.error("Java Exception during loading of Ontology: " + ex.stackTraceToString())
         null
     }
 }
