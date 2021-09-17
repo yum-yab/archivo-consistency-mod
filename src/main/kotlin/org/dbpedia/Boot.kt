@@ -198,7 +198,7 @@ fun getArchivoOntsByQuery(query: String, endpoint: String = "https://databus.dbp
         }
         return mutList.toList()
     } catch (ex: Exception) {
-        println("Error: ${ex.stackTraceToString()}")
+        logger.error("Error: ${ex.stackTraceToString()}")
         return listOf()
     }
 }
@@ -262,11 +262,11 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
     "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt",
     "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/vocafo--REC--2020--12--curation_type=parsed.nt")
 
-    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/vocafo--REC--2020--12--curation_type=parsed.nt"
+    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/voc--afo--REC--2020--12--curation_type=parsed.nt"
     var stopReached = false
     var stopCounter = 0
     val ontList = getArchivoOntsByQuery(sparql_string)
-    println(ontList.size)
+    logger.info("Found ontologies: ${ontList.size}")
     if (lastStop == "") {
         stopReached = true
     }
