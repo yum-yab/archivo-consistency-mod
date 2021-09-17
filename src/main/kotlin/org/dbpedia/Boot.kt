@@ -1,43 +1,33 @@
 package org.dbpedia
 
-import com.google.gson.Gson
+//import org.dbpedia.databus_mods.lib.worker.AsyncWorker
+//import org.dbpedia.databus_mods.lib.worker.execution.Extension
+//import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
+//import org.springframework.boot.autoconfigure.SpringBootApplication
+//import org.springframework.context.annotation.Import
+//import org.springframework.stereotype.Component
 import com.google.gson.annotations.SerializedName
-import openllet.jena.PelletInfGraph
-import openllet.jena.PelletReasonerFactory
-import org.apache.jena.Jena
 import org.apache.jena.JenaRuntime
-import org.apache.jena.ontology.OntModel
 import org.apache.jena.query.QueryExecutionFactory
 import org.apache.jena.query.QueryFactory
-import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.sparql.core.Var
 import org.dbpedia.consistencyChecks.CallableConsistencyCheck
 import org.dbpedia.consistencyChecks.ELKConsistencyCheck
 import org.dbpedia.consistencyChecks.HermiTConsistencyCheck
 import org.dbpedia.consistencyChecks.OpenlletConsistencyCheck
+import org.dbpedia.helpers.HelperFunctions
 import org.dbpedia.models.ConsistencyReport
-//import org.dbpedia.databus_mods.lib.worker.AsyncWorker
-//import org.dbpedia.databus_mods.lib.worker.execution.Extension
-//import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
-import org.semanticweb.elk.owlapi.ElkReasonerFactory
 import org.semanticweb.owlapi.apibinding.OWLManager
 import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
-//import org.springframework.boot.autoconfigure.SpringBootApplication
-//import org.springframework.context.annotation.Import
-//import org.springframework.stereotype.Component
 import java.io.File
-import java.io.FileWriter
 import java.net.URI
 import java.net.http.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import org.dbpedia.helpers.HelperFunctions
-import org.semanticweb.owlapi.rdf.rdfxml.parser.TripleLogger
-import java.io.InputStream
 
 //@SpringBootApplication
 //@Import(AsyncWorker::class)
@@ -101,17 +91,31 @@ fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOn
 fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ConsistencyReport {
     logger.info("Running ${check.reasonerCheckID}...")
     val service = Executors.newSingleThreadExecutor()
+    val future = service.submit(check)
     return try {
-        val future = service.submit(check)
         val report = future.get(timeOutCounter, timeOutUnit)
         logger.info("Finished Report of ${check.reasonerCheckID}: $report")
         report
     } catch (timeEx: TimeoutException) {
         logger.error(timeEx.stackTraceToString())
         //service.shutdownNow()
-        ConsistencyReport(check.reasonerCheckID, null, "Timeout uring execution", -1, 0)
+        ConsistencyReport(check.reasonerCheckID, null, "Timeout during execution", -1, 0)
+    } catch (intEx: InterruptedException) {
+        logger.error(intEx.stackTraceToString())
+        //service.shutdownNow()
+        ConsistencyReport(check.reasonerCheckID, null, "Timeout during execution", -1, 0)
     } finally {
-        service.shutdownNow()
+        service.shutdown()
+        try {
+            if (!service.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+                service.shutdownNow()
+                logger.debug("Service is terminated: ${service.isTerminated}")
+            }
+        } catch (e: InterruptedException) {
+            service.shutdownNow()
+            logger.error(e.stackTraceToString())
+            logger.debug("Service is terminated: ${service.isTerminated}")
+        }
     }
 }
 
@@ -119,7 +123,7 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
 
     // Download File
 
-    logger.info("Started process for ontology: ${archivoOnt.databusFileID}\nDownloading File for ont \"${archivoOnt.title}\": ${archivoOnt.dlURL}")
+    logger.info("Started process for ontology: ${archivoOnt.databusFileID}\n\tDownloading File for ont \"${archivoOnt.title}\": ${archivoOnt.dlURL}")
     val client = HttpClient.newHttpClient()
     val req = HttpRequest.newBuilder().uri(URI.create(archivoOnt.dlURL)).build()
     val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
@@ -255,9 +259,10 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
 } ORDER BY ?file  """
 
     val skiplist = listOf("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
-    "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt")
+    "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt",
+    "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/vocafo--REC--2020--12--curation_type=parsed.nt")
 
-    val lastStop = ""
+    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/vocafo--REC--2020--12--curation_type=parsed.nt"
     var stopReached = false
     var stopCounter = 0
     val ontList = getArchivoOntsByQuery(sparql_string)
@@ -282,9 +287,9 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
         logger.info(report.toString())
         File("./output.csv").appendText(report.toRow() + "\n")
     }
-//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt",
-//        "Allotrope Foundation Ontology (REC/2021/06)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt")
+//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.obolibrary.org/obo--ncbitaxon--owl/2021.06.16-143403/obo--ncbitaxon--owl_type=parsed.nt",
+//        "ncbitaxon", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.obolibrary.org/obo--ncbitaxon--owl/2021.06.16-143403/obo--ncbitaxon--owl_type=parsed.nt")
 //    val report = generateReportOfOntology(archivoOnt, 2)
-//    println(report)
+//    logger.info("Report: $report")
 }
 
