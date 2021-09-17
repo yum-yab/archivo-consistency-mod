@@ -60,7 +60,6 @@ data class ArchivoOntology(val databusFileID: String, val title: String, val dlU
 
 data class OntologyReport(val ontology: ArchivoOntology,
                           val hermitReport: ConsistencyReport,
-                          val openlletReport: ConsistencyReport,
                           val elkReport: ConsistencyReport,
                           val classCount: Int,
                           val propCount: Int,
@@ -69,7 +68,7 @@ data class OntologyReport(val ontology: ArchivoOntology,
                           val tripleCount: Int) {
 
     fun toRow(): String {
-        return "${ontology.databusFileID},${HelperFunctions.sanitizeForCSV(ontology.title)},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${HelperFunctions.sanitizeForCSV(hermitReport.message)},${openlletReport.timeUsed},${openlletReport.memoryUsage},${HelperFunctions.sanitizeForCSV(openlletReport.message)},${elkReport.timeUsed},${elkReport.memoryUsage},${HelperFunctions.sanitizeForCSV(elkReport.message)}"
+        return "${ontology.databusFileID},${HelperFunctions.sanitizeForCSV(ontology.title)},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${HelperFunctions.sanitizeForCSV(hermitReport.message)},${elkReport.timeUsed},${elkReport.memoryUsage},${HelperFunctions.sanitizeForCSV(elkReport.message)}"
     }
 }
 
@@ -133,7 +132,7 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
 
     // load into owlapi
     val inputHandler = OWLManager.createOWLOntologyManager()
-    val ont = loadOntFromString(ntString, inputHandler) ?: return OntologyReport(archivoOnt, ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), -1, -1, -1, byteSize, -1)
+    val ont = loadOntFromString(ntString, inputHandler) ?: return OntologyReport(archivoOnt, ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), -1, -1, -1, byteSize, -1)
     logger.info("Started generating the Stats for the ontology...")
     val axiomCount = ont.axiomCount
     val classCount = ont.classesInSignature().count().toInt()
@@ -142,16 +141,16 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
     logger.info("Starting Consistency Checks...")
     val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
     val elkCheck = ELKConsistencyCheck(ont, inputHandler)
-    val openlletCheck = OpenlletConsistencyCheck(ont, inputHandler)
+    //val openlletCheck = OpenlletConsistencyCheck(ont, inputHandler)
 
 
     val hermitReport = runTimeOutTask(hermitCheck, timeOutCounter, timeOutUnit)
 
     val elkReport = runTimeOutTask(elkCheck, timeOutCounter, timeOutUnit)
 
-    val openlletReport = runTimeOutTask(openlletCheck, timeOutCounter, timeOutUnit)
+    //val openlletReport = runTimeOutTask(openlletCheck, timeOutCounter, timeOutUnit)
 
-    return OntologyReport(archivoOnt, hermitReport, openlletReport, elkReport, classCount, propCount, axiomCount, byteSize, triples)
+    return OntologyReport(archivoOnt, hermitReport, elkReport, classCount, propCount, axiomCount, byteSize, triples)
 }
 
 
@@ -183,7 +182,7 @@ fun getFilesByQuery(query: String, endpoint: String = "https://databus.dbpedia.o
 
 fun getArchivoOntsByQuery(query: String, endpoint: String = "https://databus.dbpedia.org/repo/sparql"): List<ArchivoOntology> {
     val sparqlQuery = QueryFactory.create(query)
-    println(sparqlQuery.toString())
+    logger.info(sparqlQuery.toString())
     try {
         val qexec = QueryExecutionFactory.sparqlService(endpoint, sparqlQuery)
         val results = qexec.execSelect()
@@ -285,7 +284,7 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
         }
         val report = generateReportOfOntology(ont, 10)
         logger.info(report.toString())
-        File("./output.csv").appendText(report.toRow() + "\n")
+        File("./no_openllet_output.csv").appendText(report.toRow() + "\n")
     }
 //    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.obolibrary.org/obo--ncbitaxon--owl/2021.06.16-143403/obo--ncbitaxon--owl_type=parsed.nt",
 //        "ncbitaxon", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.obolibrary.org/obo--ncbitaxon--owl/2021.06.16-143403/obo--ncbitaxon--owl_type=parsed.nt")
