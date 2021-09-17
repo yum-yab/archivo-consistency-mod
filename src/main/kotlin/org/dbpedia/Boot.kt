@@ -79,7 +79,7 @@ data class OntologyReport(val ontology: ArchivoOntology,
                           val tripleCount: Int) {
 
     fun toRow(): String {
-        return "${ontology.databusFileID},${ontology.title.replace(",", ";")},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${hermitReport.message.replace(",", ";")},${openlletReport.timeUsed},${openlletReport.memoryUsage},${openlletReport.message.replace(",", ";")},${elkReport.timeUsed},${elkReport.memoryUsage},${elkReport.message.replace(",", ";")}"
+        return "${ontology.databusFileID},${HelperFunctions.sanitizeForCSV(ontology.title)},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${HelperFunctions.sanitizeForCSV(hermitReport.message)},${openlletReport.timeUsed},${openlletReport.memoryUsage},${HelperFunctions.sanitizeForCSV(openlletReport.message)},${elkReport.timeUsed},${elkReport.memoryUsage},${HelperFunctions.sanitizeForCSV(elkReport.message)}"
     }
 }
 
@@ -108,10 +108,10 @@ fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOu
         report
     } catch (timeEx: TimeoutException) {
         logger.error(timeEx.stackTraceToString())
-        service.shutdown()
+        //service.shutdownNow()
         ConsistencyReport(check.reasonerCheckID, null, "Timeout uring execution", -1, 0)
     } finally {
-        service.shutdown()
+        service.shutdownNow()
     }
 }
 
@@ -119,7 +119,7 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
 
     // Download File
 
-    logger.info("Started process for ontology: ${archivoOnt.databusFileID}\nDownloading Fil for ont \"${archivoOnt.title}\": ${archivoOnt.dlURL}")
+    logger.info("Started process for ontology: ${archivoOnt.databusFileID}\nDownloading File for ont \"${archivoOnt.title}\": ${archivoOnt.dlURL}")
     val client = HttpClient.newHttpClient()
     val req = HttpRequest.newBuilder().uri(URI.create(archivoOnt.dlURL)).build()
     val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
@@ -254,9 +254,10 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
 		  MINUS { ?distribution dataid:contentVariant 'sorted'^^xsd:string . }
 } ORDER BY ?file  """
 
-    val skiplist = listOf("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+    val skiplist = listOf("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
+    "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt")
 
-    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt"
+    val lastStop = ""
     var stopReached = false
     var stopCounter = 0
     val ontList = getArchivoOntsByQuery(sparql_string)
@@ -281,8 +282,8 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
         logger.info(report.toString())
         File("./output.csv").appendText(report.toRow() + "\n")
     }
-//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
-//        "Allotrope Foundation Ontology (REC/2021/03)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt",
+//        "Allotrope Foundation Ontology (REC/2021/06)", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt")
 //    val report = generateReportOfOntology(archivoOnt, 2)
 //    println(report)
 }

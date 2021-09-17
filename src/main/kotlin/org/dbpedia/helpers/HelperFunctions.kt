@@ -103,4 +103,8 @@ object HelperFunctions {
 
         return kb.isConsistent
     }
+
+    fun sanitizeForCSV(s: String): String {
+        return s.replace(",", ";").replace("\n", " ").replace("\t", " ")
+    }
 }
