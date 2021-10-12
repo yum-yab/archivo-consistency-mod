@@ -10,13 +10,13 @@ import com.google.gson.annotations.SerializedName
 import org.apache.jena.JenaRuntime
 import org.apache.jena.query.QueryExecutionFactory
 import org.apache.jena.query.QueryFactory
+import org.apache.jena.riot.Lang
+import org.apache.jena.riot.RDFWriter
 import org.apache.jena.sparql.core.Var
-import org.dbpedia.consistencyChecks.CallableConsistencyCheck
-import org.dbpedia.consistencyChecks.ELKConsistencyCheck
-import org.dbpedia.consistencyChecks.HermiTConsistencyCheck
-import org.dbpedia.consistencyChecks.OpenlletConsistencyCheck
+import org.dbpedia.consistencyChecks.*
 import org.dbpedia.helpers.HelperFunctions
 import org.dbpedia.models.ConsistencyReport
+import org.dbpedia.models.ReasonerReport
 import org.semanticweb.owlapi.apibinding.OWLManager
 import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
@@ -88,7 +88,7 @@ fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOn
     }
 }
 
-fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ConsistencyReport {
+fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ReasonerReport {
     logger.info("Running ${check.reasonerCheckID}...")
     val service = Executors.newSingleThreadExecutor()
     val future = service.submit(check)
@@ -99,27 +99,28 @@ fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOu
     } catch (timeEx: TimeoutException) {
         logger.error(timeEx.stackTraceToString())
         //service.shutdownNow()
-        ConsistencyReport(check.reasonerCheckID, null, "Timeout during execution", -1, 0)
+        ReasonerReport(check.reasonerCheckID, null, null, -2, "Timeout during execution", "Timeout during Execution")
     } catch (intEx: InterruptedException) {
         logger.error(intEx.stackTraceToString())
         //service.shutdownNow()
-        ConsistencyReport(check.reasonerCheckID, null, "Timeout during execution", -1, 0)
+        ReasonerReport(check.reasonerCheckID, null, null, -2, "Timeout during execution", "Timeout during Execution")
     } finally {
         service.shutdown()
         try {
             if (!service.awaitTermination(800, TimeUnit.MILLISECONDS)) {
                 service.shutdownNow()
-                logger.debug("Service is terminated: ${service.isTerminated}")
             }
         } catch (e: InterruptedException) {
             service.shutdownNow()
             logger.error(e.stackTraceToString())
-            logger.debug("Service is terminated: ${service.isTerminated}")
+        }
+        if (!service.isTerminated) {
+            logger.error("Service wasn't terminated for ${check.reasonerCheckID}")
         }
     }
 }
 
-fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, timeOutUnit: TimeUnit = TimeUnit.MINUTES): OntologyReport {
+fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, timeOutUnit: TimeUnit = TimeUnit.MINUTES) {
 
     // Download File
 
@@ -133,7 +134,7 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
 
     // load into owlapi
     val inputHandler = OWLManager.createOWLOntologyManager()
-    val ont = loadOntFromString(ntString, inputHandler) ?: return OntologyReport(archivoOnt, ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), ConsistencyReport("ERROR", null, "ERROR DURING LOADING", -11, -11), -1, -1, -1, byteSize, -1)
+    val ont = loadOntFromString(ntString, inputHandler)!!
     logger.info("Started generating the Stats for the ontology...")
     val axiomCount = ont.axiomCount
     val classCount = ont.classesInSignature().count().toInt()
@@ -142,16 +143,17 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
     logger.info("Starting Consistency Checks...")
     val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
     val elkCheck = ELKConsistencyCheck(ont, inputHandler)
-    val openlletCheck = OpenlletConsistencyCheck(ont, inputHandler)
+    val jfactCheck = JFactConsistencyCheck(ont, inputHandler)
 
 
     val hermitReport = runTimeOutTask(hermitCheck, timeOutCounter, timeOutUnit)
-
+    println(hermitReport)
     val elkReport = runTimeOutTask(elkCheck, timeOutCounter, timeOutUnit)
+    println(elkReport)
+    val jfactReport = runTimeOutTask(jfactCheck, timeOutCounter, timeOutUnit)
+    println(jfactReport)
+    println(RDFWriter.create().source(jfactReport.toModel()).lang(Lang.TTL).asString())
 
-    val openlletReport = runTimeOutTask(openlletCheck, timeOutCounter, timeOutUnit)
-
-    return OntologyReport(archivoOnt, hermitReport, openlletReport, elkReport, classCount, propCount, axiomCount, byteSize, triples)
 }
 
 
@@ -262,34 +264,34 @@ SELECT DISTINCT ?file ?title ?dlURL WHERE {
     "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt",
     "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/vocafo--REC--2020--12--curation_type=parsed.nt")
 
-    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/voc--afo--REC--2020--12--curation_type=parsed.nt"
-    var stopReached = false
-    var stopCounter = 0
-    val ontList = getArchivoOntsByQuery(sparql_string)
-    logger.info("Found ontologies: ${ontList.size}")
-    if (lastStop == "") {
-        stopReached = true
-    }
-    for (ont in ontList) {
-        if (!stopReached && ont.databusFileID != lastStop) {
-            stopCounter++
-            continue
-        } else if (!stopReached && ont.databusFileID == lastStop) {
-            stopReached = true
-            logger.info("Skipped $stopCounter Ontologies, found the last executed one")
-            continue
-        }
-        if (skiplist.contains(ont.databusFileID)){
-            logger.info("Skipped ontology ${ont.databusFileID}")
-            continue
-        }
-        val report = generateReportOfOntology(ont, 10)
-        logger.info(report.toString())
-        File("./output.csv").appendText(report.toRow() + "\n")
-    }
-//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.obolibrary.org/obo--ncbitaxon--owl/2021.06.16-143403/obo--ncbitaxon--owl_type=parsed.nt",
-//        "ncbitaxon", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.obolibrary.org/obo--ncbitaxon--owl/2021.06.16-143403/obo--ncbitaxon--owl_type=parsed.nt")
-//    val report = generateReportOfOntology(archivoOnt, 2)
-//    logger.info("Report: $report")
+//    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/voc--afo--REC--2020--12--curation_type=parsed.nt"
+//    var stopReached = false
+//    var stopCounter = 0
+//    val ontList = getArchivoOntsByQuery(sparql_string)
+//    logger.info("Found ontologies: ${ontList.size}")
+//    if (lastStop == "") {
+//        stopReached = true
+//    }
+//    for (ont in ontList) {
+//        if (!stopReached && ont.databusFileID != lastStop) {
+//            stopCounter++
+//            continue
+//        } else if (!stopReached && ont.databusFileID == lastStop) {
+//            stopReached = true
+//            logger.info("Skipped $stopCounter Ontologies, found the last executed one")
+//            continue
+//        }
+//        if (skiplist.contains(ont.databusFileID)){
+//            logger.info("Skipped ontology ${ont.databusFileID}")
+//            continue
+//        }
+//        val report = generateReportOfOntology(ont, 10)
+//        logger.info(report.toString())
+//        File("./output.csv").appendText(report.toRow() + "\n")
+//    }
+    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
+        "AFO REC", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+    val report = generateReportOfOntology(archivoOnt, 1)
+    logger.info("Report: $report")
 }
 

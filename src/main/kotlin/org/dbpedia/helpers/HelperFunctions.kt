@@ -5,10 +5,11 @@ import openllet.jena.PelletInfGraph
 import openllet.jena.PelletReasonerFactory
 import org.apache.jena.ontology.OntModel
 import org.apache.jena.rdf.model.ModelFactory
+import org.apache.jena.rdf.model.Resource
+import org.apache.jena.rdf.model.ResourceFactory
 import org.dbpedia.ConsistencyReportOld
 import org.semanticweb.elk.owlapi.ElkReasonerFactory
 import org.semanticweb.owlapi.apibinding.OWLManager
-import org.semanticweb.owlapi.model.OWLClass
 import org.semanticweb.owlapi.model.OWLOntology
 import java.io.File
 import java.io.FileWriter

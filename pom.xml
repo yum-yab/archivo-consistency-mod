@@ -54,6 +54,11 @@
             <artifactId>org.semanticweb.hermit</artifactId>
             <version>1.4.3.517</version>
         </dependency>
+        <dependency>
+            <groupId>net.sourceforge.owlapi</groupId>
+            <artifactId>jfact</artifactId>
+            <version>5.0.3</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.semanticweb.elk/elk-reasoner -->
 <!--        <dependency>-->
 <!--            <groupId>org.semanticweb.elk</groupId>-->
