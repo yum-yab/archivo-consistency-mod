@@ -11,7 +11,7 @@ data class ReasonerReport(val reasonerID: String, val isConsistent: Boolean?, va
         val model = ModelFactory.createDefaultModel()
 
         // type it as a ReasonerCheck
-        model.add(checkBlankNode, ResourceFactory.createProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), ResourceFactory.createResource("https://archivo.dbpedia.org/onto#ResonerReport"))
+        model.add(checkBlankNode, ResourceFactory.createProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), ResourceFactory.createResource("https://archivo.dbpedia.org/onto#ReasonerReport"))
         // adds all the different OWL profiles
         owlProfiles?.map { model.add(checkBlankNode, ResourceFactory.createProperty("https://archivo.dbpedia.org/onto#owlProfile"), ResourceFactory.createTypedLiteral(it)) }
         // adds if the ontology is consistent or not

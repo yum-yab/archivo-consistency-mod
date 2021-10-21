@@ -1,77 +1,44 @@
 package org.dbpedia
 
-//import org.dbpedia.databus_mods.lib.worker.AsyncWorker
-//import org.dbpedia.databus_mods.lib.worker.execution.Extension
-//import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
-//import org.springframework.boot.autoconfigure.SpringBootApplication
-//import org.springframework.context.annotation.Import
-//import org.springframework.stereotype.Component
-import com.google.gson.annotations.SerializedName
+import org.dbpedia.databus_mods.lib.worker.AsyncWorker
+import org.dbpedia.databus_mods.lib.worker.execution.Extension
+import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
+import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.context.annotation.Import
+import org.springframework.stereotype.Component
 import org.apache.jena.JenaRuntime
-import org.apache.jena.query.QueryExecutionFactory
-import org.apache.jena.query.QueryFactory
 import org.apache.jena.riot.Lang
 import org.apache.jena.riot.RDFWriter
-import org.apache.jena.sparql.core.Var
 import org.dbpedia.consistencyChecks.*
-import org.dbpedia.helpers.HelperFunctions
-import org.dbpedia.models.ConsistencyReport
+import org.dbpedia.models.ModResult
 import org.dbpedia.models.ReasonerReport
 import org.semanticweb.owlapi.apibinding.OWLManager
 import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import java.io.ByteArrayInputStream
-import java.io.File
 import java.net.URI
 import java.net.http.*
+import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-//@SpringBootApplication
-//@Import(AsyncWorker::class)
-//open class ConsistencyMod
-//
-//@Component
-//class Processor : ModProcessor {
-//    override fun process(extension: Extension) {
-//        // TODO
-//        val reasonerFactory = ElkReasonerFactory()
-////        val inputHandler = OWLManager.createOWLOntologyManager()
-////        val ouputHandler = OWLManager.createOWLOntologyManager()
-////        val ont = inputHandler.loadOntologyFromOntologyDocument(File("./testont.owl"))
-////        val reasoner = reasonerFactory.createReasoner(ont)
-////        val isConsistent = reasoner.isConsistent
-////        println("Ontology is consistent: $isConsistent")
-////        extension.setType("http://my.domain/ns#DatabusMod")
-////        // File resultFile = extension.createModResult();
-//    }
-//}
+@SpringBootApplication
+@Import(AsyncWorker::class)
+open class ConsistencyMod
+
+@Component
+class Processor : ModProcessor {
+    override fun process(extension: Extension) {
+        // TODO
+        //val modResult = generateModResult(extension.databusID(), )
+    }
+}
 
 
 val logger = LoggerFactory.getLogger("MAINSCRIPT")
-
-data class ConsistencyReportOld(@SerializedName("hermit_consistency") val hermitConsistency: Boolean?,
-                                @SerializedName("elk_consistency") val elkConsistency: Boolean?)
-
-
-data class ArchivoOntology(val databusFileID: String, val title: String, val dlURL: String)
-
-data class OntologyReport(val ontology: ArchivoOntology,
-                          val hermitReport: ConsistencyReport,
-                          val openlletReport: ConsistencyReport,
-                          val elkReport: ConsistencyReport,
-                          val classCount: Int,
-                          val propCount: Int,
-                          val axiomCount: Int,
-                          val byteSize: Int,
-                          val tripleCount: Int) {
-
-    fun toRow(): String {
-        return "${ontology.databusFileID},${HelperFunctions.sanitizeForCSV(ontology.title)},$byteSize,$tripleCount,$axiomCount,$classCount,$propCount,${hermitReport.timeUsed},${hermitReport.memoryUsage},${HelperFunctions.sanitizeForCSV(hermitReport.message)},${openlletReport.timeUsed},${openlletReport.memoryUsage},${HelperFunctions.sanitizeForCSV(openlletReport.message)},${elkReport.timeUsed},${elkReport.memoryUsage},${HelperFunctions.sanitizeForCSV(elkReport.message)}"
-    }
-}
 
 fun loadOntFromString(ntString: String, inputHandler: OWLOntologyManager): OWLOntology? {
     return try {
@@ -120,17 +87,16 @@ fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOu
     }
 }
 
-fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, timeOutUnit: TimeUnit = TimeUnit.MINUTES) {
+@Value("\${reasoner.timeout}")
+fun generateModResult(databusID: String, timeOutCounter: Long, timeOutUnit: TimeUnit = TimeUnit.MINUTES): ModResult {
 
     // Download File
-
-    logger.info("Started process for ontology: ${archivoOnt.databusFileID}\n\tDownloading File for ont \"${archivoOnt.title}\": ${archivoOnt.dlURL}")
+    val startedAt = Instant.now()
+    logger.info("Started process for file: $databusID")
     val client = HttpClient.newHttpClient()
-    val req = HttpRequest.newBuilder().uri(URI.create(archivoOnt.dlURL)).build()
+    val req = HttpRequest.newBuilder().uri(URI.create(databusID)).build()
     val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
     val ntString = resp.body()
-    // determine byte size
-    val byteSize = ntString.toByteArray().size
 
     // load into owlapi
     val inputHandler = OWLManager.createOWLOntologyManager()
@@ -139,7 +105,6 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
     val axiomCount = ont.axiomCount
     val classCount = ont.classesInSignature().count().toInt()
     val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
-    val triples = -1
     logger.info("Starting Consistency Checks...")
     val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
     val elkCheck = ELKConsistencyCheck(ont, inputHandler)
@@ -151,147 +116,20 @@ fun generateReportOfOntology(archivoOnt: ArchivoOntology, timeOutCounter: Long, 
     val elkReport = runTimeOutTask(elkCheck, timeOutCounter, timeOutUnit)
     println(elkReport)
     val jfactReport = runTimeOutTask(jfactCheck, timeOutCounter, timeOutUnit)
-    println(jfactReport)
-    println(RDFWriter.create().source(jfactReport.toModel()).lang(Lang.TTL).asString())
 
+    val modResult = ModResult(databusID, axiomCount, classCount, propCount, listOf(hermitReport, elkReport, jfactReport), startedAt)
+    println(RDFWriter.create().source(modResult.generateDataModel()).lang(Lang.TTL).asString())
+    println(RDFWriter.create().source(modResult.generateActivityModel()).lang(Lang.TTL).asString())
+    return modResult
 }
-
-
-
-
-fun loadCollectionFromURI(collectionURI: String, endpoint: String = "https://databus.dbpedia.org/repo/sparql"): List<String> {
-    val client = HttpClient.newHttpClient()
-    // fetch correct sparql query
-    val req = HttpRequest.newBuilder().uri(URI.create(collectionURI)).header("Accept", "text/sparql").build()
-    val sparqlQueryString = client.send(req, HttpResponse.BodyHandlers.ofString()).body()
-
-    return getFilesByQuery(sparqlQueryString)
-}
-
-fun getFilesByQuery(query: String, endpoint: String = "https://databus.dbpedia.org/repo/sparql"): List<String> {
-    val sparqlQuery = QueryFactory.create(query)
-    val qexec = QueryExecutionFactory.sparqlService(endpoint, sparqlQuery)
-    val results = qexec.execSelect()
-
-    val mutList = mutableListOf<String>()
-
-    while (results.hasNext()) {
-        val binding = results.nextBinding()
-        val uri = binding.get(Var.alloc("file")).toString(false)
-        mutList.add(uri)
-    }
-    return mutList.toList()
-}
-
-fun getArchivoOntsByQuery(query: String, endpoint: String = "https://databus.dbpedia.org/repo/sparql"): List<ArchivoOntology> {
-    val sparqlQuery = QueryFactory.create(query)
-    println(sparqlQuery.toString())
-    try {
-        val qexec = QueryExecutionFactory.sparqlService(endpoint, sparqlQuery)
-        val results = qexec.execSelect()
-        val mutList = mutableListOf<ArchivoOntology>()
-
-        while (results.hasNext()) {
-            val solution = results.next()
-            val fileID = solution["file"].asResource().uri
-            val dlURL = solution["dlURL"].asResource().uri
-            val title = solution["title"].asLiteral().string
-            mutList.add(ArchivoOntology(fileID, title, dlURL))
-        }
-        return mutList.toList()
-    } catch (ex: Exception) {
-        logger.error("Error: ${ex.stackTraceToString()}")
-        return listOf()
-    }
-}
-
 
 fun main(args: Array<String>) {
-    //runApplication<ConsistencyMod>(*args)
-//    val inputHandler = OWLManager.createOWLOntologyManager()
-//    val ont = inputHandler.resultList(File("./testont.owl"))
-//    val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
-//    val elkCheck = ELKConsistencyCheck(ont, inputHandler)
-//
-//    val service = Executors.newSingleThreadExecutor()
-//
-//    val future = service.submit(hermitCheck)
-//
-//    println(future.get(5, TimeUnit.MINUTES))
-//
-//    val elkFuture = service.submit(elkCheck)
-//
-//    println(elkFuture.get(5, TimeUnit.MINUTES))
-//
-//    service.shutdown()
     org.apache.jena.query.ARQ.init()
     JenaRuntime.isRDF11 = false
-    val sparql_string = """PREFIX dc: <http://purl.org/dc/elements/1.1/>
-PREFIX data: <http://data.odw.tw/>
-PREFIX da: <https://www.wowman.org/index.php?id=1&type=get#>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX dcat: <http://www.w3.org/ns/dcat#>
-PREFIX dct: <http://purl.org/dc/terms/>
-PREFIX dataid-cv: <http://dataid.dbpedia.org/ns/cv#>
-PREFIX dataid: <http://dataid.dbpedia.org/ns/core#>
-PREFIX databus: <https://databus.dbpedia.org/>
-SELECT DISTINCT ?file ?title ?dlURL WHERE { 
-		  ?dataset dataid:account databus:ontologies .
-		  ?dataset dataid:artifact ?art.
-		  ?dataset dcat:distribution ?distribution .
-  		  ?dataset dct:title ?title .
-		  ?distribution dataid-cv:type 'parsed'^^xsd:string . 
-		  ?distribution dataid:formatExtension 'nt'^^xsd:string . 
-		  ?distribution dataid:file ?file .
-  		  ?distribution dcat:downloadURL ?dlURL .
-		  ?dataset dct:hasVersion ?latestVersion .
-		  { 
-		    # Selects the latest version
-		    SELECT DISTINCT ?art (MAX(?v) as ?latestVersion) WHERE {
-		      ?dataset dataid:account databus:ontologies .
-			  ?dataset dataid:artifact ?art.
-			  ?dataset dcat:distribution ?distribution .
-			  ?dataset dct:hasVersion ?v .
-			} GROUP BY ?art 
-		  }
-		  # Excludes dev versions
-		  FILTER (!regex(?art, "--DEV"))
-		  # Excludes sorted versions to prevent duplicates
-		  MINUS { ?distribution dataid:contentVariant 'sorted'^^xsd:string . }
-} ORDER BY ?file  """
-
-    val skiplist = listOf("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
-    "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--06--afo/2021.08.04-200617/voc--afo--REC--2021--06--afo_type=parsed.nt",
-    "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/vocafo--REC--2020--12--curation_type=parsed.nt")
-
-//    val lastStop = "https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2020--12--curation/2021.07.26-152230/voc--afo--REC--2020--12--curation_type=parsed.nt"
-//    var stopReached = false
-//    var stopCounter = 0
-//    val ontList = getArchivoOntsByQuery(sparql_string)
-//    logger.info("Found ontologies: ${ontList.size}")
-//    if (lastStop == "") {
-//        stopReached = true
-//    }
-//    for (ont in ontList) {
-//        if (!stopReached && ont.databusFileID != lastStop) {
-//            stopCounter++
-//            continue
-//        } else if (!stopReached && ont.databusFileID == lastStop) {
-//            stopReached = true
-//            logger.info("Skipped $stopCounter Ontologies, found the last executed one")
-//            continue
-//        }
-//        if (skiplist.contains(ont.databusFileID)){
-//            logger.info("Skipped ontology ${ont.databusFileID}")
-//            continue
-//        }
-//        val report = generateReportOfOntology(ont, 10)
-//        logger.info(report.toString())
-//        File("./output.csv").appendText(report.toRow() + "\n")
-//    }
-    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
-        "AFO REC", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
-    val report = generateReportOfOntology(archivoOnt, 1)
+    val exampleID = "https://databus.dbpedia.org/ontologies/dbpedia.org/ontology--DEV/2021.10.02-164001/ontology--DEV_type=parsed.ttl"
+//    val archivoOnt = ArchivoOntology("https://databus.dbpedia.org/ontologies/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt",
+//        "AFO REC", "https://akswnc7.informatik.uni-leipzig.de/dstreitmatter/archivo/purl.allotrope.org/voc--afo--REC--2021--03--afo/2021.07.04-010558/voc--afo--REC--2021--03--afo_type=parsed.nt")
+    val report = generateModResult(exampleID, 10)
     logger.info("Report: $report")
 }
 
