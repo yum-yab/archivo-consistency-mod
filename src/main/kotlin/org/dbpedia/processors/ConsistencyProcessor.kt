@@ -100,11 +100,11 @@ class ConsistencyProcessor: ModProcessor {
         } catch (timeEx: TimeoutException) {
             org.dbpedia.logger.error(timeEx.stackTraceToString())
             //service.shutdownNow()
-            ReasonerReport(check.reasonerCheckID, null, null, -2, "Timeout during execution", "Timeout during Execution")
+            ReasonerReport(check.reasonerCheckID, null, null, null, "Timeout during execution", "Timeout during Execution")
         } catch (intEx: InterruptedException) {
             org.dbpedia.logger.error(intEx.stackTraceToString())
             //service.shutdownNow()
-            ReasonerReport(check.reasonerCheckID, null, null, -2, "Timeout during execution", "Timeout during Execution")
+            ReasonerReport(check.reasonerCheckID, null, null, null, "Timeout during execution", "Timeout during Execution")
         } finally {
             service.shutdown()
             try {

@@ -1,15 +1,14 @@
 package org.dbpedia.consistencyChecks
 
-import org.apache.jena.base.Sys
-import org.dbpedia.models.ConsistencyReport
 import org.dbpedia.models.ReasonerReport
-import org.semanticweb.owl.explanation.api.ExplanationManager
 import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
 import org.semanticweb.owlapi.profiles.Profiles
 import org.semanticweb.owlapi.reasoner.InconsistentOntologyException
 import org.semanticweb.owlapi.reasoner.OWLReasonerFactory
 import org.slf4j.Logger
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.Callable
 
 abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, private val factory: OWLReasonerFactory, private val owlOntologyManager: OWLOntologyManager): Callable<ReasonerReport> {
@@ -35,11 +34,11 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
             logger.error("Java Exception: " + ex.stackTraceToString())
             errorMessage = "Error during loading the Ontology: " + ex.stackTraceToString()
             null
-        } ?: return ReasonerReport(reasonerCheckID, null, null, -1, errorMessage, errorMessage)
+        } ?: return ReasonerReport(reasonerCheckID, null, null, null, errorMessage, errorMessage)
 
         //Step 2: Determine Consistency
         errorMessage = ""
-        val beforeConsistsency = System.currentTimeMillis()
+        val beforeConsistsency = Instant.now()
         val consistent = try {
             reasoner.isConsistent
         } catch (intEx: InterruptedException) {
@@ -82,7 +81,7 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
             errorMessage = "PROFILECHECK: Process got interrupted: " + ex.stackTraceToString()
             null
         }
-        val timeUsed = System.currentTimeMillis() - beforeConsistsency
+        val timeUsed = Duration.between(beforeConsistsency, Instant.now())
         val profileMessage = if (errorMessage == "") "PROFILECHECK: No Problems occurred" else errorMessage
 
         return ReasonerReport(reasonerCheckID, consistent, profiles, timeUsed, consistencyMesage, profileMessage)
