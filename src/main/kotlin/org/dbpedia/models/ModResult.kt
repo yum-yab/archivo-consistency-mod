@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter
 
 
 
-data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: Int, val propertyCount: Int, val reasonerReports: List<ReasonerReport>, val startedAt: Instant, val endedAt: Instant = Instant.now()) {
+data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: Int, val propertyCount: Int, val reasonerReports: List<ReasonerReport>) {
 
     /*
     Here the naming conventions for the files are defined:
@@ -51,14 +51,14 @@ data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: In
             ResourceFactory.createProperty("http://www.w3.org/ns/prov#used"),
             ResourceFactory.createResource(dbusId))
         // provide time stamps
-        model.add(ResourceFactory.createResource(activityIdentity),
-            ResourceFactory.createProperty("http://www.w3.org/ns/prov#startedAtTime"),
-            ResourceFactory.createTypedLiteral(DateTimeFormatter.ISO_INSTANT.format(startedAt), XSDDatatype.XSDdateTime))
-        model.add(ResourceFactory.createResource(activityIdentity),
-            ResourceFactory.createProperty("http://www.w3.org/ns/prov#endedAtTime"),
-            ResourceFactory.createTypedLiteral(DateTimeFormatter.ISO_INSTANT.format(endedAt), XSDDatatype.XSDdateTime))
-
-        return model.setNsPrefixes(HelperConstants.namespaces)
+//        model.add(ResourceFactory.createResource(activityIdentity),
+//            ResourceFactory.createProperty("http://www.w3.org/ns/prov#startedAtTime"),
+//            ResourceFactory.createTypedLiteral(DateTimeFormatter.ISO_INSTANT.format(startedAt), XSDDatatype.XSDdateTime))
+//        model.add(ResourceFactory.createResource(activityIdentity),
+//            ResourceFactory.createProperty("http://www.w3.org/ns/prov#endedAtTime"),
+//            ResourceFactory.createTypedLiteral(DateTimeFormatter.ISO_INSTANT.format(endedAt), XSDDatatype.XSDdateTime))
+//        model.setNsPrefixes(HelperConstants.namespaces)
+        return model
     }
 
     fun generateDataModel(): Model {
@@ -85,6 +85,7 @@ data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: In
             )
             model.add(report.toModel())
         }
-        return model.setNsPrefixes(HelperConstants.namespaces)
+        model.setNsPrefixes(HelperConstants.namespaces)
+        return model
     }
 }
