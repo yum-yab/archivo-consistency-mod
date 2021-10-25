@@ -4,7 +4,6 @@ import org.dbpedia.consistencyChecks.CallableConsistencyCheck
 import org.dbpedia.consistencyChecks.ELKConsistencyCheck
 import org.dbpedia.consistencyChecks.HermiTConsistencyCheck
 import org.dbpedia.consistencyChecks.JFactConsistencyCheck
-import org.dbpedia.databus_mods.lib.util.IORdfUtil
 import org.dbpedia.databus_mods.lib.util.UriUtil
 import org.dbpedia.databus_mods.lib.worker.execution.Extension
 import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
@@ -18,14 +17,8 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.nio.charset.StandardCharsets
-import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -34,7 +27,9 @@ import java.util.concurrent.TimeoutException
 class ConsistencyProcessor: ModProcessor {
 
     private val logger: Logger = LoggerFactory.getLogger(ConsistencyProcessor::class.java)
-
+    init {
+        logger.info("Started Successfully!!!!!!")
+    }
 
     // load timeout from cfg
     @Value("\${reasoners.timeout}")
@@ -81,28 +76,28 @@ class ConsistencyProcessor: ModProcessor {
         return try {
             inputHandler.loadOntologyFromOntologyDocument(inputStream)
         } catch (ex: Exception) {
-            org.dbpedia.logger.error("Exception during loading of Ontology: " + ex.stackTraceToString())
+            logger.error("Exception during loading of Ontology: " + ex.stackTraceToString())
             null
         } catch (ex: java.lang.Exception) {
-            org.dbpedia.logger.error("Java Exception during loading of Ontology: " + ex.stackTraceToString())
+            logger.error("Java Exception during loading of Ontology: " + ex.stackTraceToString())
             null
         }
     }
 
     private fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ReasonerReport {
-        org.dbpedia.logger.info("Running ${check.reasonerCheckID}...")
+        logger.info("Running ${check.reasonerCheckID}...")
         val service = Executors.newSingleThreadExecutor()
         val future = service.submit(check)
         return try {
             val report = future.get(timeOutCounter, timeOutUnit)
-            org.dbpedia.logger.info("Finished Report of ${check.reasonerCheckID}: $report")
+            logger.info("Finished Report of ${check.reasonerCheckID}: $report")
             report
         } catch (timeEx: TimeoutException) {
-            org.dbpedia.logger.error(timeEx.stackTraceToString())
+            logger.error(timeEx.stackTraceToString())
             //service.shutdownNow()
             ReasonerReport(check.reasonerCheckID, null, null, null, "Timeout during execution", "Timeout during Execution")
         } catch (intEx: InterruptedException) {
-            org.dbpedia.logger.error(intEx.stackTraceToString())
+            logger.error(intEx.stackTraceToString())
             //service.shutdownNow()
             ReasonerReport(check.reasonerCheckID, null, null, null, "Timeout during execution", "Timeout during Execution")
         } finally {
@@ -113,10 +108,10 @@ class ConsistencyProcessor: ModProcessor {
                 }
             } catch (e: InterruptedException) {
                 service.shutdownNow()
-                org.dbpedia.logger.error(e.stackTraceToString())
+                logger.error(e.stackTraceToString())
             }
             if (!service.isTerminated) {
-                org.dbpedia.logger.error("Service wasn't terminated for ${check.reasonerCheckID}")
+                logger.error("Service wasn't terminated for ${check.reasonerCheckID}")
             }
         }
     }

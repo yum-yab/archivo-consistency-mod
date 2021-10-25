@@ -186,7 +186,7 @@
                         <configuration>
                             <archive>
                                 <manifest>
-                                    <mainClass>org.dbpedia.BootKt</mainClass>
+                                    <mainClass>org.dbpedia.WorkerKt</mainClass>
                                 </manifest>
                             </archive>
                             <descriptorRefs>
