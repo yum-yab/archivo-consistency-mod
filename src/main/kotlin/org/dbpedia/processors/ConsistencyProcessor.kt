@@ -11,13 +11,10 @@ import org.dbpedia.helpers.HelperConstants
 import org.dbpedia.models.ModResult
 import org.dbpedia.models.ReasonerReport
 import org.semanticweb.owlapi.apibinding.OWLManager
-import org.semanticweb.owlapi.model.OWLOntology
-import org.semanticweb.owlapi.model.OWLOntologyManager
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import java.io.InputStream
 import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -51,7 +48,7 @@ class ConsistencyProcessor: ModProcessor {
         inputStream.use {
             // load into owlapi
             val inputHandler = OWLManager.createOWLOntologyManager()
-            val ont = loadOntFromString(it, inputHandler)!!
+            val ont = inputHandler.loadOntologyFromOntologyDocument(it)
             logger.info("Started generating the Stats for the ontology...")
             val axiomCount = ont.axiomCount
             val classCount = ont.classesInSignature().count().toInt()
@@ -69,18 +66,6 @@ class ConsistencyProcessor: ModProcessor {
             val modResult = ModResult(extension.source(), axiomCount, classCount, propCount, listOf(hermitReport, elkReport, jfactReport))
             val consistencyModel = modResult.generateDataModel()
             consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
-        }
-    }
-
-    private fun loadOntFromString(inputStream: InputStream, inputHandler: OWLOntologyManager): OWLOntology? {
-        return try {
-            inputHandler.loadOntologyFromOntologyDocument(inputStream)
-        } catch (ex: Exception) {
-            logger.error("Exception during loading of Ontology: " + ex.stackTraceToString())
-            null
-        } catch (ex: java.lang.Exception) {
-            logger.error("Java Exception during loading of Ontology: " + ex.stackTraceToString())
-            null
         }
     }
 
