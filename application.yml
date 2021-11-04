@@ -1,0 +1,6 @@
+server:
+  port: 9000
+worker:
+  volume: ./target/volume
+reasoners:
+  timeout: 10
