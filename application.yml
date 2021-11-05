@@ -3,4 +3,4 @@ server:
 worker:
   volume: ./target/volume
 reasoners:
-  timeout: 10
+  timeout: 1

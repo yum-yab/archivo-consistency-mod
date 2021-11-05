@@ -1,6 +1,6 @@
 
 worker:
-  volume: /workspace/target/volume/
+  volume: ./target/volume/
 
 reasoners:
   timeout: 10

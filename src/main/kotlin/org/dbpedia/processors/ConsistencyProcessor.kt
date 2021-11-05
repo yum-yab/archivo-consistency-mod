@@ -16,6 +16,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.net.URI
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -54,18 +56,18 @@ class ConsistencyProcessor: ModProcessor {
             val classCount = ont.classesInSignature().count().toInt()
             val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
             logger.info("Starting Consistency Checks...")
-            val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
-            val elkCheck = ELKConsistencyCheck(ont, inputHandler)
-            val jfactCheck = JFactConsistencyCheck(ont, inputHandler)
-
-
-            val hermitReport = runTimeOutTask(hermitCheck, timeOutCounter, timeOutUnit)
-            val elkReport = runTimeOutTask(elkCheck, timeOutCounter, timeOutUnit)
-            val jfactReport = runTimeOutTask(jfactCheck, timeOutCounter, timeOutUnit)
-
-            val modResult = ModResult(extension.source(), axiomCount, classCount, propCount, listOf(hermitReport, elkReport, jfactReport))
-            val consistencyModel = modResult.generateDataModel()
-            consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
+//            val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
+//            val elkCheck = ELKConsistencyCheck(ont, inputHandler)
+//            val jfactCheck = JFactConsistencyCheck(ont, inputHandler)
+//
+//
+//            val hermitReport = runTimeOutTask(hermitCheck, timeOutCounter, timeOutUnit)
+//            val elkReport = runTimeOutTask(elkCheck, timeOutCounter, timeOutUnit)
+//            val jfactReport = runTimeOutTask(jfactCheck, timeOutCounter, timeOutUnit)
+//
+//            val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, listOf(hermitReport, elkReport, jfactReport))
+//            val consistencyModel = modResult.generateDataModel()
+//            consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
         }
     }
 
@@ -95,8 +97,8 @@ class ConsistencyProcessor: ModProcessor {
                 service.shutdownNow()
                 logger.error(e.stackTraceToString())
             }
-            if (!service.isTerminated) {
-                logger.error("Service wasn't terminated for ${check.reasonerCheckID}")
+            if (!service.isShutdown) {
+                logger.error("Service wasn't shut down for ${check.reasonerCheckID}")
             }
         }
     }

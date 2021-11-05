@@ -5,39 +5,24 @@ import org.semanticweb.owlapi.model.OWLOntology
 import org.semanticweb.owlapi.model.OWLOntologyManager
 import org.semanticweb.owlapi.profiles.Profiles
 import org.semanticweb.owlapi.reasoner.InconsistentOntologyException
+import org.semanticweb.owlapi.reasoner.OWLReasoner
 import org.semanticweb.owlapi.reasoner.OWLReasonerFactory
 import org.slf4j.Logger
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
-abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, private val factory: OWLReasonerFactory, private val owlOntologyManager: OWLOntologyManager): Callable<ReasonerReport> {
+abstract class CallableConsistencyCheck(val reasoner: OWLReasoner, val factory: OWLReasonerFactory): Callable<ReasonerReport> {
 
     protected abstract val logger: Logger
 
     abstract val reasonerCheckID: String
 
     override fun call(): ReasonerReport {
+        println("In check: ${reasoner.toString()}")
         var errorMessage = ""
-
-        // Step 1: Load the reasoner, return error report if it didnt work
-        val reasoner = try {
-            factory.createReasoner(owlOntology)
-        } catch (ex: OutOfMemoryError) {
-            logger.error("Out of Memory: " + ex.stackTraceToString())
-            errorMessage = "Error during loading the Ontology: " + ex.stackTraceToString()
-            null
-        } catch (ex: Exception) {
-            errorMessage = "Error during loading the Ontology: " + ex.stackTraceToString()
-            null
-        } catch (ex: java.lang.Exception) {
-            logger.error("Java Exception: " + ex.stackTraceToString())
-            errorMessage = "Error during loading the Ontology: " + ex.stackTraceToString()
-            null
-        } ?: return ReasonerReport(reasonerCheckID, null, null, null, errorMessage, errorMessage)
-
         //Step 2: Determine Consistency
-        errorMessage = ""
         val beforeConsistsency = Instant.now()
         val consistent = try {
             reasoner.isConsistent
@@ -63,7 +48,7 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
         // Step 3: Determine Profile
         errorMessage = ""
         val profiles = try {
-            determineProfile(owlOntology)
+            determineProfile(reasoner.rootOntology)
         } catch (intEx: InterruptedException) {
             logger.warn("Process got interrupted!")
             errorMessage = "PROFILECHECK: Process got interrupted: " + intEx.stackTraceToString()
@@ -97,4 +82,6 @@ abstract class CallableConsistencyCheck(private val owlOntology: OWLOntology, pr
         }
         return resultList.toList()
     }
+
+
 }
