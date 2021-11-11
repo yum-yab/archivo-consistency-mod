@@ -12,6 +12,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.lang.Exception
 import java.net.URI
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -40,13 +41,12 @@ class ConsistencyProcessor: ModProcessor {
         extension.setType("http://mods.tools.dbpedia.org/ns/demo#ArchivoReasonerMod")
         HelperConstants.namespaces.nsPrefixMap.map { extension.addPrefix(it.key, it.value) }
         // Download File
+        // load into owlapi
         val inputStream = UriUtil.openStream(URI(extension.source()))
         val ont = inputStream.use {
             val inputHandler = OWLManager.createOWLOntologyManager()
             inputHandler.loadOntologyFromOntologyDocument(it)
         }
-            // load into owlapi
-
         logger.info("Started generating the Stats for the ontology...")
         val axiomCount = ont.axiomCount
         val classCount = ont.classesInSignature().count().toInt()
@@ -54,7 +54,16 @@ class ConsistencyProcessor: ModProcessor {
         logger.info("Starting Consistency Checks...")
 
         // initiate checks
-        val checks = listOf(HermiTConsistencyCheck(ont), ELKConsistencyCheck(ont), JFactConsistencyCheck(ont))
+
+        val checks = listOf(HermiTConsistencyCheck::class, ELKConsistencyCheck::class, JFactConsistencyCheck::class).mapNotNull {
+            try {
+                // call constructor
+                it.constructors.first().call(ont)
+            } catch (ex: Exception) {
+                logger.error("Problem constructing the Reasoner for $it: ${ex.stackTraceToString()}")
+                null
+            }
+        }
         // run them after each other
         val reports = checks.map {
             getReport(it)
@@ -89,4 +98,6 @@ class ConsistencyProcessor: ModProcessor {
 
         return report
     }
+
+
 }
