@@ -48,7 +48,13 @@
             <artifactId>owlapi-distribution</artifactId>
             <version>5.1.19</version>
         </dependency>
-
+        <!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-reflect -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+            <version>1.5.31</version>
+            <scope>runtime</scope>
+        </dependency>
         <dependency>
             <groupId>net.sourceforge.owlapi</groupId>
             <artifactId>org.semanticweb.hermit</artifactId>
