@@ -1,13 +1,11 @@
-package org.dbpedia.consistencyChecks
+package org.dbpedia.runnables
 
 import org.semanticweb.HermiT.ReasonerFactory
 import org.semanticweb.owlapi.model.OWLOntology
-import org.semanticweb.owlapi.model.OWLOntologyManager
-import org.semanticweb.owlapi.reasoner.OWLReasoner
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class HermiTConsistencyCheck(reasoner: OWLReasoner): CallableConsistencyCheck(factory = ReasonerFactory(), reasoner = reasoner) {
+class HermiTConsistencyCheck(ont: OWLOntology): RunnableConsistencyCheck(reasoner = ReasonerFactory().createReasoner(ont)) {
 
     override val reasonerCheckID: String by lazy {
         "HermiTConsistencyCheck"

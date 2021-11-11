@@ -1,15 +1,12 @@
 package org.dbpedia.processors
 
-import org.dbpedia.consistencyChecks.CallableConsistencyCheck
-import org.dbpedia.consistencyChecks.ELKConsistencyCheck
-import org.dbpedia.consistencyChecks.HermiTConsistencyCheck
-import org.dbpedia.consistencyChecks.JFactConsistencyCheck
 import org.dbpedia.databus_mods.lib.util.UriUtil
 import org.dbpedia.databus_mods.lib.worker.execution.Extension
 import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
 import org.dbpedia.helpers.HelperConstants
 import org.dbpedia.models.ModResult
 import org.dbpedia.models.ReasonerReport
+import org.dbpedia.runnables.*
 import org.semanticweb.owlapi.apibinding.OWLManager
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -17,10 +14,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.net.URI
 import java.time.Duration
-import java.time.Instant
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 @Component
 class ConsistencyProcessor: ModProcessor {
@@ -47,59 +41,52 @@ class ConsistencyProcessor: ModProcessor {
         HelperConstants.namespaces.nsPrefixMap.map { extension.addPrefix(it.key, it.value) }
         // Download File
         val inputStream = UriUtil.openStream(URI(extension.source()))
-        inputStream.use {
-            // load into owlapi
+        val ont = inputStream.use {
             val inputHandler = OWLManager.createOWLOntologyManager()
-            val ont = inputHandler.loadOntologyFromOntologyDocument(it)
-            logger.info("Started generating the Stats for the ontology...")
-            val axiomCount = ont.axiomCount
-            val classCount = ont.classesInSignature().count().toInt()
-            val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
-            logger.info("Starting Consistency Checks...")
-//            val hermitCheck = HermiTConsistencyCheck(ont, inputHandler)
-//            val elkCheck = ELKConsistencyCheck(ont, inputHandler)
-//            val jfactCheck = JFactConsistencyCheck(ont, inputHandler)
-//
-//
-//            val hermitReport = runTimeOutTask(hermitCheck, timeOutCounter, timeOutUnit)
-//            val elkReport = runTimeOutTask(elkCheck, timeOutCounter, timeOutUnit)
-//            val jfactReport = runTimeOutTask(jfactCheck, timeOutCounter, timeOutUnit)
-//
-//            val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, listOf(hermitReport, elkReport, jfactReport))
-//            val consistencyModel = modResult.generateDataModel()
-//            consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
+            inputHandler.loadOntologyFromOntologyDocument(it)
         }
+            // load into owlapi
+
+        logger.info("Started generating the Stats for the ontology...")
+        val axiomCount = ont.axiomCount
+        val classCount = ont.classesInSignature().count().toInt()
+        val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
+        logger.info("Starting Consistency Checks...")
+
+        // initiate checks
+        val checks = listOf(HermiTConsistencyCheck(ont), ELKConsistencyCheck(ont), JFactConsistencyCheck(ont))
+        // run them after each other
+        val reports = checks.map {
+            getReport(it)
+        }
+        val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, reports)
+        val consistencyModel = modResult.generateDataModel()
+        consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
     }
 
-    private fun runTimeOutTask(check: CallableConsistencyCheck, timeOutCounter: Long, timeOutUnit: TimeUnit): ReasonerReport {
-        logger.info("Running ${check.reasonerCheckID}...")
-        val service = Executors.newSingleThreadExecutor()
-        val future = service.submit(check)
-        return try {
-            val report = future.get(timeOutCounter, timeOutUnit)
-            logger.info("Finished Report of ${check.reasonerCheckID}: $report")
-            report
-        } catch (timeEx: TimeoutException) {
-            logger.error(timeEx.stackTraceToString())
-            //service.shutdownNow()
-            ReasonerReport(check.reasonerCheckID, null, null, null, "Timeout during execution", "Timeout during Execution")
-        } catch (intEx: InterruptedException) {
-            logger.error(intEx.stackTraceToString())
-            //service.shutdownNow()
-            ReasonerReport(check.reasonerCheckID, null, null, null, "Timeout during execution", "Timeout during Execution")
-        } finally {
-            service.shutdown()
-            try {
-                if (!service.awaitTermination(800, TimeUnit.MILLISECONDS)) {
-                    service.shutdownNow()
-                }
-            } catch (e: InterruptedException) {
-                service.shutdownNow()
-                logger.error(e.stackTraceToString())
-            }
-            if (!service.isShutdown) {
-                logger.error("Service wasn't shut down for ${check.reasonerCheckID}")
-            }
+    private fun getReport(task: RunnableConsistencyCheck): ReasonerReport {
+        timeOutCounter!!
+        val t = Thread(task)
+        t.start()
+        val end = System.currentTimeMillis() + (timeOutCounter * 1000 * 30)
+
+        while (task.reasonerReport == null && System.currentTimeMillis() < end) {
+            Thread.sleep(100)
         }
+        task.interrupted = true
+        val report = task.reasonerReport
+            ?: ReasonerReport(
+                reasonerID = task.reasonerCheckID,
+                isConsistent = null,
+                owlProfiles = emptyList(),
+                inspectionTime = Duration.ofMinutes(timeOutCounter),
+                messageConsistency = "CONSITENCY LOG: Process got interrupted after timeout $timeOutCounter",
+                messageProfiles = "CONSITENCY LOG: Process got interrupted after timeout $timeOutCounter"
+            )
+
+        // this is deprecated but works, so its fine I guess?
+        t.stop()
+
+        return report
     }
 }

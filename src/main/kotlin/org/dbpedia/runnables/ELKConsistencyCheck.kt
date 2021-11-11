@@ -1,13 +1,11 @@
-package org.dbpedia.consistencyChecks
+package org.dbpedia.runnables
 
 import org.semanticweb.elk.owlapi.ElkReasonerFactory
 import org.semanticweb.owlapi.model.OWLOntology
-import org.semanticweb.owlapi.model.OWLOntologyManager
-import org.semanticweb.owlapi.reasoner.OWLReasoner
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class ELKConsistencyCheck(reasoner: OWLReasoner): CallableConsistencyCheck(factory = ElkReasonerFactory(), reasoner = reasoner) {
+class ELKConsistencyCheck(ont: OWLOntology): RunnableConsistencyCheck(ElkReasonerFactory().createReasoner(ont)) {
 
     override val reasonerCheckID: String by lazy {
         "ELKConsistencyCheck"
