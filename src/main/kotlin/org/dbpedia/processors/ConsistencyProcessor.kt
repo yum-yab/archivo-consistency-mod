@@ -36,6 +36,7 @@ class ConsistencyProcessor: ModProcessor {
         // be null safe, maybe do something more clever here
         timeOutCounter!!
         extension!!
+
         logger.info("Started process for file: ${extension.source()}")
         // set the values of the extension and add some prefixes
         extension.setType("http://mods.tools.dbpedia.org/ns/demo#ArchivoReasonerMod")
@@ -49,8 +50,20 @@ class ConsistencyProcessor: ModProcessor {
         }
         logger.info("Started generating the Stats for the ontology...")
         val axiomCount = ont.axiomCount
+        logger.debug("Axioms: $axiomCount")
         val classCount = ont.classesInSignature().count().toInt()
+        logger.debug("Classes: $classCount")
         val propCount = (ont.dataPropertiesInSignature().count() + ont.objectPropertiesInSignature().count()).toInt()
+        logger.debug("Properties: $propCount")
+        val endtime = System.currentTimeMillis() + (timeOutCounter * 1000 * 60)
+        val profiles = try {
+            getProfiles(RunnableProfileCheck(ont), endtime)
+        } catch (ex: Exception) {
+            logger.error("problem during OWL2 profile calculation: " + ex.stackTraceToString())
+            null
+        }
+        logger.debug("Profiles: $profiles")
+
         logger.info("Starting Consistency Checks...")
 
         // initiate checks
@@ -68,7 +81,7 @@ class ConsistencyProcessor: ModProcessor {
         val reports = checks.map {
             getReport(it)
         }
-        val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, reports)
+        val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, profiles, reports)
         val consistencyModel = modResult.generateDataModel()
         consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
     }
@@ -76,27 +89,42 @@ class ConsistencyProcessor: ModProcessor {
     private fun getReport(task: RunnableConsistencyCheck): ReasonerReport {
         timeOutCounter!!
         val t = Thread(task)
+        val end = System.currentTimeMillis() + (timeOutCounter * 1000 * 60)
         t.start()
-        val end = System.currentTimeMillis() + (timeOutCounter * 1000 * 30)
 
         while (task.reasonerReport == null && System.currentTimeMillis() < end) {
             Thread.sleep(100)
         }
-        task.interrupted = true
+        task.interrupt()
         val report = task.reasonerReport
             ?: ReasonerReport(
                 reasonerID = task.reasonerCheckID,
                 isConsistent = null,
-                owlProfiles = emptyList(),
-                inspectionTime = Duration.ofMinutes(timeOutCounter),
+                inspectionTime = (timeOutCounter * 60 * 1000).toInt(),
                 messageConsistency = "CONSITENCY LOG: Process got interrupted after timeout $timeOutCounter",
-                messageProfiles = "CONSITENCY LOG: Process got interrupted after timeout $timeOutCounter"
             )
 
         // this is deprecated but works, so its fine I guess?
         t.stop()
 
         return report
+    }
+
+    private fun getProfiles(profileCheck: RunnableProfileCheck, endtime: Long): List<String> {
+        timeOutCounter!!
+        val t = Thread(profileCheck)
+        t.start()
+
+        while (!profileCheck.finished && System.currentTimeMillis() < endtime) {
+            Thread.sleep(100)
+        }
+        profileCheck.interrupted = true
+        val profiles = profileCheck.getFinalProfiles()
+
+        // this is deprecated but works, so its fine I guess?
+        t.stop()
+
+        return profiles
     }
 
 

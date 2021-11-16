@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter
 
 
 
-data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: Int, val propertyCount: Int, val reasonerReports: List<ReasonerReport>) {
+data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: Int, val propertyCount: Int, val profiles: List<String>?, val reasonerReports: List<ReasonerReport>) {
 
     fun generateDataModel(): Model {
         val model = ModelFactory.createDefaultModel()
@@ -30,6 +30,12 @@ data class ModResult(val dbusId: String, val axiomCount: Int, val classCount: In
             ResourceFactory.createProperty("https://archivo.dbpedia.org/onto#propertyCount"),
             ResourceFactory.createTypedLiteral(propertyCount)
         )
+        profiles?.map {
+            model.add(ResourceFactory.createResource(dbusId),
+                ResourceFactory.createProperty("https://archivo.dbpedia.org/onto#owlProfile"),
+                ResourceFactory.createTypedLiteral(it)
+            )
+        }
         // add models from the reasoner reports
         for (report in reasonerReports) {
             model.add(ResourceFactory.createResource(dbusId),
