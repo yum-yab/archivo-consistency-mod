@@ -24,9 +24,6 @@ import java.util.concurrent.TimeUnit
 class ConsistencyProcessor: ModProcessor {
 
     private val logger: Logger = LoggerFactory.getLogger(ConsistencyProcessor::class.java)
-    init {
-        logger.info("Started Successfully!!!!!!")
-    }
 
     // load timeout from cfg
     @Value("\${reasoners.timeout}")
@@ -124,7 +121,6 @@ class ConsistencyProcessor: ModProcessor {
     }
 
     private fun getReport(task: RunnableConsistencyCheck): ReasonerReport {
-        timeOutCounter!!
         val t = Thread(task)
         val end = System.currentTimeMillis() + (timeOutCounter * 1000 * 60)
         t.start()
@@ -156,7 +152,6 @@ class ConsistencyProcessor: ModProcessor {
     }
 
     private fun getProfiles(profileCheck: RunnableProfileCheck, endtime: Long): List<String> {
-        timeOutCounter!!
         val t = Thread(profileCheck)
         t.start()
 
