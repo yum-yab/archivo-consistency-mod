@@ -117,7 +117,8 @@ class ConsistencyProcessor: ModProcessor {
         // add the data to the extension
         val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, profiles, reports)
         val consistencyModel = modResult.generateDataModel()
-        consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
+        resultModel.add(consistencyModel)
+        resultModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
     }
 
     private fun getReport(task: RunnableConsistencyCheck): ReasonerReport {
