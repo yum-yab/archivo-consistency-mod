@@ -15,6 +15,4 @@ import java.io.FileWriter
 An object with various different functions making the code cleaner and not fitting in the models
  */
 
-object HelperFunctions {
-
-}
+object HelperFunctions

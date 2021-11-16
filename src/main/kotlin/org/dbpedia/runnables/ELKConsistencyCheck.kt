@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 class ELKConsistencyCheck(ont: OWLOntology): RunnableConsistencyCheck(ElkReasonerFactory().createReasoner(ont)) {
 
     override val reasonerCheckID: String by lazy {
-        "ELKConsistencyCheck"
+        "ELK"
     }
 
     override val logger: Logger by lazy {

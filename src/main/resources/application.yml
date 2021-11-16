@@ -1,6 +1,16 @@
-
+# volume to write the results to
 worker:
   volume: ./target/volume/
 
+# reasoners configuration
+# timeout -> number of minutes after the consistency check should be aborted
+# reprieve -> number of seconds the system should wait for the reasoners to be interrupted before killing the thread
 reasoners:
   timeout: 10
+  reprieve: 20
+
+# version information for provenance
+# currentHash -> should be the current commit hash (e.g. for github) the mod results were created with
+#                since this can never be the correct one paste the result of "git rev-parse HEAD" in here
+version:
+  currentHash: "6d346a419c35d2b59bad21607242307ff36ff0dd"

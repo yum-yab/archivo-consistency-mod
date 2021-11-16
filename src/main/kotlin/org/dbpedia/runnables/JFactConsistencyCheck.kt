@@ -8,7 +8,7 @@ import uk.ac.manchester.cs.jfact.JFactFactory
 class JFactConsistencyCheck(ont: OWLOntology): RunnableConsistencyCheck(reasoner = JFactFactory().createReasoner(ont)) {
 
     override val reasonerCheckID: String by lazy {
-        "JFactConsistencyCheck"
+        "JFact"
     }
 
     override val logger: Logger by lazy {

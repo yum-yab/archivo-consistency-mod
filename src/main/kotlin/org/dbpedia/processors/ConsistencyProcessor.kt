@@ -1,5 +1,6 @@
 package org.dbpedia.processors
 
+import org.apache.jena.rdf.model.ResourceFactory
 import org.dbpedia.databus_mods.lib.util.UriUtil
 import org.dbpedia.databus_mods.lib.worker.execution.Extension
 import org.dbpedia.databus_mods.lib.worker.execution.ModProcessor
@@ -14,7 +15,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.lang.Exception
 import java.net.URI
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 @Component
@@ -28,6 +28,12 @@ class ConsistencyProcessor: ModProcessor {
     // load timeout from cfg
     @Value("\${reasoners.timeout}")
     private val timeOutCounter: Long? = null
+
+    @Value("\${version.currentHash}")
+    private val currentHash: String = ""
+
+    @Value("\${reasoners.reprieve}")
+    private val reprieveTime: Int = 10
 
     // default timeout in minutes
     private val timeOutUnit = TimeUnit.MINUTES
@@ -68,7 +74,7 @@ class ConsistencyProcessor: ModProcessor {
 
         // initiate checks
 
-        val checks = listOf(HermiTConsistencyCheck::class, ELKConsistencyCheck::class, JFactConsistencyCheck::class).mapNotNull {
+        val checks = listOf(HermiTConsistencyCheck::class, ELKConsistencyCheck::class, JFactConsistencyCheck::class, OpenlletConsistencyCheck::class).mapNotNull {
             try {
                 // call constructor
                 it.constructors.first().call(ont)
@@ -81,6 +87,13 @@ class ConsistencyProcessor: ModProcessor {
         val reports = checks.map {
             getReport(it)
         }
+        // set the current commit hash as version
+        extension.model.add(ResourceFactory.createResource("metadata.ttl"),
+                            ResourceFactory.createProperty("http://dataid.dbpedia.org/ns/mods/core#version"),
+                            ResourceFactory.createTypedLiteral(currentHash)
+        )
+
+        // add the data to the extension
         val modResult = ModResult(extension.databusID(), axiomCount, classCount, propCount, profiles, reports)
         val consistencyModel = modResult.generateDataModel()
         consistencyModel.write(extension.createModResult("consistencyChecks.ttl","http://dataid.dbpedia.org/ns/mods#statisticsDerivedFrom"), "TURTLE")
@@ -96,6 +109,11 @@ class ConsistencyProcessor: ModProcessor {
             Thread.sleep(100)
         }
         task.interrupt()
+        t.interrupt()
+        val endOfReprieve = System.currentTimeMillis() + (reprieveTime * 1000)
+        while(t.isAlive && System.currentTimeMillis() < endOfReprieve) {
+            Thread.sleep(100)
+        }
         val report = task.reasonerReport
             ?: ReasonerReport(
                 reasonerID = task.reasonerCheckID,
@@ -105,7 +123,10 @@ class ConsistencyProcessor: ModProcessor {
             )
 
         // this is deprecated but works, so its fine I guess?
-        t.stop()
+        if (t.isAlive) {
+            logger.info("Thread has to be stopped!")
+            t.stop()
+        }
 
         return report
     }
@@ -119,10 +140,18 @@ class ConsistencyProcessor: ModProcessor {
             Thread.sleep(100)
         }
         profileCheck.interrupted = true
+        t.interrupt()
+        val endOfReprieve = System.currentTimeMillis() + (reprieveTime * 1000)
+        while(t.isAlive && System.currentTimeMillis() < endOfReprieve) {
+            Thread.sleep(100)
+        }
         val profiles = profileCheck.getFinalProfiles()
 
         // this is deprecated but works, so its fine I guess?
-        t.stop()
+        if (t.isAlive) {
+            logger.info("Thread has to be stopped!")
+            t.stop()
+        }
 
         return profiles
     }

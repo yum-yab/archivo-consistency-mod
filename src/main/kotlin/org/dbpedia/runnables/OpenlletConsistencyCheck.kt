@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory
 
 class OpenlletConsistencyCheck(ont: OWLOntology): RunnableConsistencyCheck(reasoner = OpenlletReasonerFactory().createReasoner(ont)) {
     override val reasonerCheckID: String by lazy {
-        "OpenlletReasoner"
+        "Openllet"
     }
 
     override val logger: Logger by lazy {
