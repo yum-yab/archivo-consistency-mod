@@ -1,5 +1,7 @@
 package org.dbpedia.processors
 
+import org.apache.jena.rdf.model.Model
+import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdf.model.ResourceFactory
 import org.dbpedia.databus_mods.lib.util.UriUtil
 import org.dbpedia.databus_mods.lib.worker.execution.Extension
@@ -9,6 +11,7 @@ import org.dbpedia.models.ModResult
 import org.dbpedia.models.ReasonerReport
 import org.dbpedia.runnables.*
 import org.semanticweb.owlapi.apibinding.OWLManager
+import org.semanticweb.owlapi.model.OWLOntology
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -27,7 +30,7 @@ class ConsistencyProcessor: ModProcessor {
 
     // load timeout from cfg
     @Value("\${reasoners.timeout}")
-    private val timeOutCounter: Long? = null
+    private val timeOutCounter: Long = 1
 
     @Value("\${version.currentHash}")
     private val currentHash: String = ""
@@ -40,9 +43,7 @@ class ConsistencyProcessor: ModProcessor {
 
     override fun process(extension: Extension?) {
         // be null safe, maybe do something more clever here
-        timeOutCounter!!
         extension!!
-
         logger.info("Started process for file: ${extension.source()}")
         // set the values of the extension and add some prefixes
         extension.setType("http://mods.tools.dbpedia.org/ns/demo#ArchivoReasonerMod")
@@ -50,10 +51,33 @@ class ConsistencyProcessor: ModProcessor {
         // Download File
         // load into owlapi
         val inputStream = UriUtil.openStream(URI(extension.source()))
-        val ont = inputStream.use {
-            val inputHandler = OWLManager.createOWLOntologyManager()
-            inputHandler.loadOntologyFromOntologyDocument(it)
+        var owlapiLog = "Loading in OWLAPI successfull"
+        val ont = try {
+                inputStream.use {
+                    val inputHandler = OWLManager.createOWLOntologyManager()
+                    inputHandler.loadOntologyFromOntologyDocument(it)
+                }
+            } catch (ex: Exception) {
+                owlapiLog = "ERROR during OWLAPI loading: " + ex.stackTraceToString()
+                null
+            }
+        extension.model.add(
+            ResourceFactory.createResource("metadata.ttl"),
+            ResourceFactory.createProperty("http://dataid.dbpedia.org/ns/mods/core#version"),
+            ResourceFactory.createTypedLiteral(currentHash)
+        )
+        val resultModel = ModelFactory.createDefaultModel()
+        resultModel.add(
+            ResourceFactory.createResource(extension.databusID()),
+            ResourceFactory.createProperty("https://archivo.dbpedia.org/onto#log"),
+            ResourceFactory.createTypedLiteral(owlapiLog)
+        )
+        if (ont != null) {
+            generateRealReport(extension, ont, resultModel)
         }
+    }
+
+    private fun generateRealReport(extension: Extension, ont: OWLOntology, resultModel: Model) {
         logger.info("Started generating the Stats for the ontology...")
         val axiomCount = ont.axiomCount
         logger.debug("Axioms: $axiomCount")
@@ -89,8 +113,8 @@ class ConsistencyProcessor: ModProcessor {
         }
         // set the current commit hash as version
         extension.model.add(ResourceFactory.createResource("metadata.ttl"),
-                            ResourceFactory.createProperty("http://dataid.dbpedia.org/ns/mods/core#version"),
-                            ResourceFactory.createTypedLiteral(currentHash)
+            ResourceFactory.createProperty("http://dataid.dbpedia.org/ns/mods/core#version"),
+            ResourceFactory.createTypedLiteral(currentHash)
         )
 
         // add the data to the extension
