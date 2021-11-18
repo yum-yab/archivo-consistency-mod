@@ -25,6 +25,11 @@
     </parent>
 
     <repositories>
+	<repository>
+            <id>dev.dbpedia</id>
+            <name>Development Repo</name>
+            <url>https://akswnc7.informatik.uni-leipzig.de/dav/m2/</url>
+        </repository>
         <repository>
             <id>sonatype-nexus-snapshots</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
